@@ -10,12 +10,18 @@
   
 /* See [8254] for hardware details of the 8254 timer chip. */
 
+// Used for BSD scheduler
+#define RECALC_FREQ 4
+
 #if TIMER_FREQ < 19
 #error 8254 timer requires TIMER_FREQ >= 19
 #endif
 #if TIMER_FREQ > 1000
 #error TIMER_FREQ <= 1000 recommended
 #endif
+
+/* List: List of the sleeping threads */
+static struct list sleeping_list;
 
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
@@ -35,6 +41,8 @@ static void real_time_delay (int64_t num, int32_t denom);
 void
 timer_init (void) 
 {
+  list_init(&sleeping_list);
+
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
 }
@@ -89,11 +97,30 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
-  int64_t start = timer_ticks ();
+  //must turn interrupts off before calling thread_block()
+  //int old_intr_level = intr_disable();
 
   ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+  if (ticks <= 0) return;
+
+
+  //initing intr_lvl to keep track of the older labels
+  enum intr_level old_level = intr_disable ();
+ 
+  // Algorithm: 
+  // Turn interrupts off temporarily to:
+  // - calculate ticks to stop sleep
+  // - add thread to sleep list
+  // - block thread
+  thread_current()->ticks = timer_ticks() + ticks;
+  
+  list_insert_ordered(&sleeping_list, &thread_current()->elem,
+                     (list_less_func *) &cmp_ticks, NULL);
+
+  //each thread needs to be set to the list, then slept.
+  //each thread has a level that also needs to be handled.
+  thread_block();
+  intr_set_level(old_level);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -172,6 +199,29 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
+
+  if (thread_mlfqs) return;
+
+  //Starts with the sleeping list.
+  struct list_elem *element = list_begin(&sleeping_list);
+  while (element != list_end(&sleeping_list))
+    {
+      struct thread *t1 = list_entry(element, struct thread, elem);
+      if (ticks < t1->ticks)
+        {
+          break;
+        }
+
+      list_remove(element); // remove from the sleeping list
+
+      thread_unblock(t1); // Unblock and add to ready list
+
+      element = list_begin(&sleeping_list);
+
+    }
+
+  test_max_priority(); // Tests if thread still has max priority
+
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

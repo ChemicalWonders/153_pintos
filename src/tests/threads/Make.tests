@@ -37,16 +37,16 @@ tests/threads_SRC += tests/threads/mlfqs-recent-1.c
 tests/threads_SRC += tests/threads/mlfqs-fair.c
 tests/threads_SRC += tests/threads/mlfqs-block.c
 
-MLFQS_OUTPUTS = 				\
-tests/threads/mlfqs-load-1.output		\
-tests/threads/mlfqs-load-60.output		\
-tests/threads/mlfqs-load-avg.output		\
-tests/threads/mlfqs-recent-1.output		\
-tests/threads/mlfqs-fair-2.output		\
-tests/threads/mlfqs-fair-20.output		\
-tests/threads/mlfqs-nice-2.output		\
-tests/threads/mlfqs-nice-10.output		\
-tests/threads/mlfqs-block.output
+#MLFQS_OUTPUTS = 				\
+#tests/threads/mlfqs-load-1.output		\
+#tests/threads/mlfqs-load-60.output		\
+#tests/threads/mlfqs-load-avg.output		\
+#tests/threads/mlfqs-recent-1.output		\
+#tests/threads/mlfqs-fair-2.output		\
+#tests/threads/mlfqs-fair-20.output		\
+#tests/threads/mlfqs-nice-2.output		\
+#tests/threads/mlfqs-nice-10.output		\
+#tests/threads/mlfqs-block.output
 
 $(MLFQS_OUTPUTS): KERNELFLAGS += -mlfqs
 $(MLFQS_OUTPUTS): TIMEOUT = 480
