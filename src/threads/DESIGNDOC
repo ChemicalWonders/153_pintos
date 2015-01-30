@@ -1,5 +1,5 @@
-			+--------------------+
-			|        CS 153      |
+
+S 153      |
 			| PROJECT 1: THREADS |
 			|   DESIGN DOCUMENT  |
 			+--------------------+
@@ -104,20 +104,76 @@ this solution because it was simple and clean.
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+additional struct members in thread struct
+
+int tmp_priority
+temporary, donated priority for thread 
+
+struct lock *locked
+lock that the thread is waiting to acquire
+
+struct lock *aquired
+lock that current thread has aquired
+
 >> B2: Explain the data structure used to track priority donation.
 >> Use ASCII art to diagram a nested donation.  (Alternately, submit a
 >> .png file.)
+
+Given threads: H, M1, M2, L
+          A     B
+--H-M2->|M1|-->|L|
+
+H and M2 are waiting on lock A
+M1 is waiting on lock B
+
+H 
+locked = A  aquired = NULL
+M1
+locked = B  aquired = A
+M2
+locked = A  aquired = NULL
+L
+locked = NULL  aquired = B
+
+M1->tmp_priority = max(H,M1,M2)
+L->tmp_priority = max(M1,L)
 
 ---- ALGORITHMS ----
 
 >> B3: How do you ensure that the highest priority thread waiting for
 >> a lock, semaphore, or condition variable wakes up first?
 
+The given code had the first thread in the waiting list be chosen to run.
+So I simply inserted the threads in order according to priority in the
+list so that the highest priority thread would be at the head of the 
+list and would be chosen first. If 2 threads had the same priority, 
+then they are ordered with FIFO.
+
 >> B4: Describe the sequence of events when a call to lock_acquire()
 >> causes a priority donation.  How is nested donation handled?
 
+1  the thread sets its locked member to the lock its trying to aquire
+
+2  if the lock_holder has a priority that is either higher or equal to
+   the current thread then break
+
+3  set the priority of the lock_holder equal to the priority of the 
+   current thread
+
+4  checks to make sure that the depth of these steps does not exceed 8
+   nests to prevent infinite loops.
+
 >> B5: Describe the sequence of events when lock_release() is called
 >> on a lock that a higher-priority thread is waiting for.
+
+1  The lock is released
+
+2  The thread that released the lock loses its donated priority
+
+3  Find the highest priority thread on the waiting list (the first one)
+
+4  That thread aquires the lock and is put on the ready_list
+
 
 ---- SYNCHRONIZATION ----
 
@@ -125,10 +181,22 @@ this solution because it was simple and clean.
 >> how your implementation avoids it.  Can you use a lock to avoid
 >> this race?
 
+Potential race condition: While the thread's priority is being changed,
+an interrupt handler could come in and also change the priority since
+the priority is updated there as well. 
+
+Implemented Solution: disable interrupts inside thread_set_priority().
+Locks cannot be used since the handler cannot acquire them.
+
 ---- RATIONALE ----
 
 >> B7: Why did you choose this design?  In what ways is it superior to
 >> another design you considered?
+
+This design was effiecient and used fewer variables. My main priority
+was to keep things simple and clean. The other design I had considered
+was one where I would have the threads have a list of what locks they 
+owned or were waiting on. But this seemed too bulky and confusing.
 
 			  ADVANCED SCHEDULER
 			    (If Attempted)
