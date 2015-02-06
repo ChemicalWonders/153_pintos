@@ -88,6 +88,9 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
+    int tmp_priority;
+    struct lock *locked;
+    struct lock *aquired;
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
@@ -147,4 +150,8 @@ bool cmp_ticks (const struct list_elem *a,
               void *aux UNUSED);
 
 void test_max_priority (void);
+bool cmp (const struct list_elem *neew, 
+          const struct list_elem *old, 
+          void *aux UNUSED);
+void thread_donate (void);
 #endif /* threads/thread.h */
