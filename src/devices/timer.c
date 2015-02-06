@@ -105,10 +105,10 @@ timer_sleep (int64_t ticks)
   enum intr_level old_level = intr_disable ();
  
   // Algorithm: 
-  // Turn interrupts off temporarily to:
+  // Turn interrupts off to:
   // - calculate ticks to stop sleep
-  // - add thread to sleep list
-  // - block thread
+  // - add thread to sleeping_list
+  // - block to prevent from moving forward
   thread_current()->ticks = timer_ticks() + ticks;
   
   list_insert_ordered(&sleeping_list, &thread_current()->elem,
