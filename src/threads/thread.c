@@ -71,8 +71,7 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 bool cmp (const struct list_elem *neew, 
-          const struct list_elem *old, 
-          void *aux UNUSED);
+          const struct list_elem *old);
 void thread_donate (void);
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -481,7 +480,7 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
-  t->tmp_priority = 0;
+  t->tmp_priority = priority;
   t->locked = NULL;
   t->aquired = NULL;
   t->magic = THREAD_MAGIC;
@@ -604,12 +603,11 @@ uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
 /* New Function stuff for this project */
 bool cmp_ticks (const struct list_elem *a,
-                const struct list_elem *b,
-                void *aux UNUSED)
+                const struct list_elem *b)
 {
-  struct thread *ta = list_entry(a, struct thread, elem);
-  struct thread *tb = list_entry(b, struct thread, elem);
-  if (ta->ticks < tb->ticks)
+  struct thread *at = list_entry(a, struct thread, elem);
+  struct thread *bt = list_entry(b, struct thread, elem);
+  if (at->ticks < bt->ticks)
     {
       return true;
     }
@@ -641,13 +639,12 @@ void test_max_priority (void)
     }
 }
 
-bool cmp (const struct list_elem *old, 
-          const struct list_elem *neew, 
-          void * aux UNUSED)
+bool cmp (const struct list_elem *old_list_elem, 
+          const struct list_elem *new_list_elem)
 {
-  struct thread *to = list_entry (old, struct thread, elem);
-  struct thread *tn = list_entry (neew, struct thread, elem);
-  return to->priority > tn->priority;
+  struct thread *old_thread = list_entry (old_list_elem, struct thread, elem);
+  struct thread *new_thread = list_entry (new_list_elem, struct thread, elem);
+  return old_thread->priority > new_thread->priority;
 }
 
 void thread_donate (void)

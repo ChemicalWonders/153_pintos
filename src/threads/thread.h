@@ -146,12 +146,10 @@ int thread_get_load_avg (void);
 
 /* Newly added functions */
 bool cmp_ticks (const struct list_elem *a,
-              const struct list_elem *b,
-              void *aux UNUSED);
+              const struct list_elem *b);
 
 void test_max_priority (void);
 bool cmp (const struct list_elem *neew, 
-          const struct list_elem *old, 
-          void *aux UNUSED);
+          const struct list_elem *old);
 void thread_donate (void);
 #endif /* threads/thread.h */
