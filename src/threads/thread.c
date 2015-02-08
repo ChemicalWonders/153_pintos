@@ -70,10 +70,7 @@ static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
-bool cmp (const struct list_elem *neew, 
-          const struct list_elem *old, 
-          void *aux UNUSED);
-void thread_donate (void);
+
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -212,10 +209,6 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
-  old_level = intr_disable ();
-  test_max_priority ();
-  intr_set_level (old_level);
-
   return tid;
 }
 
@@ -252,10 +245,8 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-
-  list_insert_ordered (&ready_list, &t->elem, cmp, NULL);
+  list_push_back (&ready_list, &t->elem);
   t->status = THREAD_READY;
-  //test_max_priority ();
   intr_set_level (old_level);
 }
 
@@ -325,7 +316,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-   list_insert_ordered (&ready_list, &cur->elem, cmp, NULL);
+    list_push_back (&ready_list, &cur->elem);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -352,11 +343,7 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  enum intr_level old_level;
-  old_level = intr_disable ();
   thread_current ()->priority = new_priority;
-  test_max_priority ();
-  intr_set_level (old_level);
 }
 
 /* Returns the current thread's priority. */
@@ -481,9 +468,6 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
-  t->tmp_priority = 0;
-  t->locked = NULL;
-  t->aquired = NULL;
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);
 }
@@ -641,38 +625,3 @@ void test_max_priority (void)
     }
 }
 
-bool cmp (const struct list_elem *old, 
-          const struct list_elem *neew, 
-          void * aux UNUSED)
-{
-  struct thread *to = list_entry (old, struct thread, elem);
-  struct thread *tn = list_entry (neew, struct thread, elem);
-  return to->priority > tn->priority;
-}
-
-void thread_donate (void)
-{
-  int nestNum = 0;
-  struct thread *cur = thread_current ();
-  struct lock *loc = cur->locked;
-  while (loc != NULL)
-  {
-    if (loc->holder == NULL)
-    {
-      return;
-    }
-    if (cur->priority <= loc->holder->priority)
-    {
-      return;
-    }
-    if (nestNum > 9)
-    {
-      return;
-    }  
-    ++nestNum;
-    
-  }
-
-
-
-}

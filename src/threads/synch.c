@@ -68,12 +68,10 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
-      list_insert_ordered (&sema->waiters, &thread_current ()->elem, cmp, NULL);
-      //thread_donate ();
+      list_push_back (&sema->waiters, &thread_current ()->elem);
       thread_block ();
     }
   sema->value--;
-  //thread_current ()->tmp_priority = thread_current ()->priority; 
   intr_set_level (old_level);
 }
 
@@ -94,8 +92,7 @@ sema_try_down (struct semaphore *sema)
   if (sema->value > 0) 
     {
       sema->value--;
-      success = true;
-      thread_current ()->tmp_priority = thread_current ()->priority; 
+      success = true; 
     }
   else
     success = false;
@@ -120,8 +117,6 @@ sema_up (struct semaphore *sema)
     thread_unblock (list_entry (list_pop_front (&sema->waiters),
                                 struct thread, elem));
   sema->value++;
-  //thread_current ()->priority = thread_current ()->tmp_priority; 
-  test_max_priority ();
   intr_set_level (old_level);
 }
 
@@ -200,14 +195,9 @@ lock_acquire (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
-  
-  struct thread *t = thread_current ();
-  t->locked = lock;
-  thread_donate ();
+
   sema_down (&lock->semaphore);
-  lock->holder = t;
-  t->locked = NULL;
-  t->aquired = lock;
+  lock->holder = thread_current ();
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -226,12 +216,7 @@ lock_try_acquire (struct lock *lock)
 
   success = sema_try_down (&lock->semaphore);
   if (success)
-  {
-    struct thread *t = thread_current ();
-    lock->holder = t;
-    t->aquired = lock;
-    t->tmp_priority = t->priority;
-  }
+    lock->holder = thread_current ();
   return success;
 }
 
@@ -310,7 +295,7 @@ cond_wait (struct condition *cond, struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
   
   sema_init (&waiter.semaphore, 0);
-  list_insert_ordered (&cond->waiters, &thread_current ()->elem, cmp, NULL); 
+  list_push_back (&cond->waiters, &waiter.elem);
   lock_release (lock);
   sema_down (&waiter.semaphore);
   lock_acquire (lock);
