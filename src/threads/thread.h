@@ -92,7 +92,8 @@ struct thread
     struct list_elem allelem;           /* List element for all threads list. */
     struct lock *locked;
     struct lock *aquired;
-
+    
+    int64_t ticks;
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
     
@@ -142,6 +143,8 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 void thread_queue_ready(struct thread *);
+
+bool cmp_ticks (const struct list_elem *a, const struct list_elem *b);
 bool cmp (const struct list_elem *old, const struct list_elem *neew, void *aux UNUSED);
 void thread_donate (void);
 int thread_get_donate (struct thread *cur);

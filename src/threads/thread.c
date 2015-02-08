@@ -73,6 +73,10 @@ static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
+
+
+bool cmp_ticks (const struct list_elem *a, const struct list_elem *b);
+void test_max_priority (void);
 void thread_donate (void);
 bool cmp (const struct list_elem *old, const struct list_elem *neew, void *aux UNUSED);
 int thread_get_donate (struct thread *cur);
@@ -260,8 +264,8 @@ thread_block (void)
 {
   ASSERT (!intr_context ());
   ASSERT (intr_get_level () == INTR_OFF);
-  struct thread *t = thread_current();
-  t->status = THREAD_BLOCKED;
+  
+  thread_current ()->status = THREAD_BLOCKED;
 
   schedule ();
 }
@@ -278,32 +282,16 @@ void
 thread_unblock (struct thread *t) 
 {
   enum intr_level old_level;
-
   ASSERT (is_thread (t));
-
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_remove (&t->elem);
-  thread_queue_ready(t);
+  
+  list_insert_ordered (&ready_list, &t->elem, cmp, NULL);
   t->status = THREAD_READY;
-
+  //test_max_priority ();
   intr_set_level (old_level);
 }
 
-void
-thread_sleep (void)
-{
-  ASSERT(!intr_context ());
-  ASSERT(intr_get_level () == INTR_OFF);
-  struct thread *t = thread_current();
-  t->status = THREAD_BLOCKED;
-
-  if(t != idle_thread)
-  {
-    list_push_back(&sleep_list, &t->elem);
-  }
-  schedule();
-}
 /* Returns the name of the running thread. */
 const char *
 thread_name (void) 
@@ -364,12 +352,11 @@ thread_yield (void)
 {
   struct thread *cur = thread_current ();
   enum intr_level old_level;
-  
   ASSERT (!intr_context ());
-
   old_level = intr_disable ();
-  if(cur != idle_thread)
-      thread_queue_ready(cur);
+  
+  if (cur != idle_thread)
+    list_insert_ordered (&ready_list, &cur->elem, cmp, NULL);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -380,7 +367,6 @@ thread_yield (void)
 void
 thread_foreach (thread_action_func *func, void *aux)
 {
-  ASSERT (intr_get_level() == INTR_OFF);
   struct list_elem *e;
 
   ASSERT (intr_get_level () == INTR_OFF);
@@ -568,8 +554,6 @@ init_thread (struct thread *t, const char *name, int priority)
   t->locked = NULL;
   t->aquired = NULL;
   t->magic = THREAD_MAGIC;
-  t->time_sleep = 0;
-  list_push_back (&sleep_list,&t->elem);
   list_push_back (&all_list, &t->allelem);
 }
 
@@ -594,17 +578,15 @@ alloc_frame (struct thread *t, size_t size)
 static struct thread *
 next_thread_to_run (void) 
 {
-    if (list_empty (&ready_list))
-    {
-      return idle_thread;
-    }
-    else
-    {
-      list_sort (&ready_list, cmp, NULL);
-      struct thread *t = list_entry (list_front (&ready_list), struct thread, elem);
-      list_remove (list_front (&ready_list));
-      return t;
-    }
+  if (list_empty (&ready_list))
+  {
+    return idle_thread;
+  }
+    
+  else
+  {
+    return list_entry (list_pop_front (&ready_list), struct thread, elem);     
+  }
 }
 
 /* Completes a thread switch by activating the new thread's page
@@ -672,9 +654,7 @@ schedule (void)
   ASSERT (is_thread (next));
 
   if (cur != next)
-  {
     prev = switch_threads (cur, next);
-  }
   thread_schedule_tail (prev);
 }
 
@@ -696,10 +676,41 @@ allocate_tid (void)
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
-void 
-thread_queue_ready(struct thread *t)
+bool cmp_ticks (const struct list_elem *a, const struct list_elem *b)
 {
-      list_push_back(&ready_list, &t->elem);
+  struct thread *at = list_entry(a, struct thread, elem);
+  struct thread *bt = list_entry(b, struct thread, elem);
+  if (at->ticks < bt->ticks)
+  {
+    return true;
+  }
+  return false;
+}
+
+
+void test_max_priority (void)
+{
+  if ( list_empty(&ready_list) )
+  {
+    return;
+  }
+  struct thread *t = list_entry(list_front(&ready_list),
+  struct thread, elem);
+  if (intr_context())
+  {
+    thread_ticks++;
+    if ( thread_current()->priority < t->priority ||
+    (thread_ticks >= TIME_SLICE &&
+    thread_current()->priority == t->priority) )
+    {
+      intr_yield_on_return();
+    }
+    return;
+  }
+  if (thread_current()->priority < t->priority)
+  {
+    thread_yield();
+  }
 }
 
 bool
