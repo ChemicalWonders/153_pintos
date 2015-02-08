@@ -89,20 +89,18 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     int tmp_priority;
+    struct list_elem allelem;           /* List element for all threads list. */
     struct lock *locked;
     struct lock *aquired;
-    struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
     
-    /* Used for timer sleep */
-    int64_t ticks;
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
 #endif
-
+      unsigned time_sleep;
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
@@ -143,15 +141,8 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
-
-/* Newly added functions */
-bool cmp_ticks (const struct list_elem *a,
-              const struct list_elem *b,
-              void *aux UNUSED);
-
-void test_max_priority (void);
-bool cmp (const struct list_elem *neew, 
-          const struct list_elem *old, 
-          void *aux UNUSED);
+void thread_queue_ready(struct thread *);
+bool cmp (const struct list_elem *old, const struct list_elem *neew, void *aux UNUSED);
 void thread_donate (void);
+int thread_get_donate (struct thread *cur);
 #endif /* threads/thread.h */
